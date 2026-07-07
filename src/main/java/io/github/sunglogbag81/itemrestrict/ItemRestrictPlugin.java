@@ -3,6 +3,7 @@ package io.github.sunglogbag81.itemrestrict;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.block.ShulkerBox;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
@@ -27,6 +28,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,6 +47,7 @@ public final class ItemRestrictPlugin extends JavaPlugin implements Listener, Ta
     private boolean removeRestrictedItems;
     private boolean scanOnJoin;
     private boolean scanOnInventoryActions;
+    private boolean scanContainerContents;
     private boolean notifyRemoval;
     private String prefix;
 
@@ -66,6 +69,7 @@ public final class ItemRestrictPlugin extends JavaPlugin implements Listener, Ta
         removeRestrictedItems = getConfig().getBoolean("settings.remove-restricted-items", true);
         scanOnJoin = getConfig().getBoolean("settings.scan-on-join", true);
         scanOnInventoryActions = getConfig().getBoolean("settings.scan-on-inventory-actions", true);
+        scanContainerContents = getConfig().getBoolean("settings.scan-container-contents", true);
         notifyRemoval = getConfig().getBoolean("settings.notify-removal", true);
         prefix = color(getConfig().getString("messages.prefix", "&c[아이템제한] &f"));
 
@@ -335,7 +339,28 @@ public final class ItemRestrictPlugin extends JavaPlugin implements Listener, Ta
     }
 
     private boolean isRestricted(ItemStack itemStack) {
-        return itemStack != null && !itemStack.getType().isAir() && restrictedMaterials.contains(itemStack.getType());
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return false;
+        }
+        if (restrictedMaterials.contains(itemStack.getType())) {
+            return true;
+        }
+        return scanContainerContents && containsRestrictedContainerContent(itemStack);
+    }
+
+    private boolean containsRestrictedContainerContent(ItemStack itemStack) {
+        if (!(itemStack.getItemMeta() instanceof BlockStateMeta blockStateMeta)) {
+            return false;
+        }
+        if (!(blockStateMeta.getBlockState() instanceof ShulkerBox shulkerBox)) {
+            return false;
+        }
+        for (ItemStack content : shulkerBox.getInventory().getContents()) {
+            if (isRestricted(content)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isBypassed(Player player) {
